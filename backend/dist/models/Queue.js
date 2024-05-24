@@ -95,10 +95,6 @@ __decorate([
     __metadata("design:type", Number)
 ], Queue.prototype, "orderQueue", void 0);
 __decorate([
-    sequelize_typescript_1.Column,
-    __metadata("design:type", Number)
-], Queue.prototype, "chatOperator", void 0);
-__decorate([
     (0, sequelize_typescript_1.ForeignKey)(() => QueueIntegrations_1.default),
     sequelize_typescript_1.Column,
     __metadata("design:type", Number)

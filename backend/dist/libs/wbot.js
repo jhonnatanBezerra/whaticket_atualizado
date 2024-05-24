@@ -96,6 +96,7 @@ const initWASocket = async (whatsapp) => {
                     browser: baileys_1.Browsers.appropriate("Desktop"),
                     auth: {
                         creds: state.creds,
+                        // @ts-ignore
                         keys: (0, baileys_1.makeCacheableSignalKeyStore)(state.keys, logger_1.logger),
                     },
                     version,

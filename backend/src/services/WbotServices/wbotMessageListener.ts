@@ -46,7 +46,7 @@ import Setting from "../../models/Setting";
 import { cacheLayer } from "../../libs/cache";
 import { provider } from "./providers";
 import { debounce } from "../../helpers/Debounce";
-import { ChatCompletionRequestMessage, Configuration, OpenAIApi } from "openai";
+// import { ChatCompletionRequestMessage, Configuration, OpenAIApi } from "openai";
 import ffmpeg from "fluent-ffmpeg";
 import {
   SpeechConfig,
@@ -66,10 +66,10 @@ type Session = WASocket & {
   store?: Store;
 };
 
-interface SessionOpenAi extends OpenAIApi {
-  id?: number;
-}
-const sessionsOpenAi: SessionOpenAi[] = [];
+// interface SessionOpenAi extends OpenAIApi {
+//   id?: number;
+// }
+// const sessionsOpenAi: SessionOpenAi[] = [];
 
 interface ImessageUpsert {
   messages: proto.IWebMessageInfo[];
@@ -533,6 +533,7 @@ const sanitizeName = (name: string): string => {
   sanitized = sanitized.replace(/[^a-zA-Z0-9]/g, "");
   return sanitized.substring(0, 60);
 };
+
 const convertTextToSpeechAndSaveToFile = (
   text: string,
   filename: string,
@@ -607,198 +608,199 @@ const deleteFileSync = (path: string): void => {
 const keepOnlySpecifiedChars = (str: string) => {
   return str.replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚâêîôûÂÊÎÔÛãõÃÕçÇ!?.,;:\s]/g, "");
 };
-const handleOpenAi = async (
-  msg: proto.IWebMessageInfo,
-  wbot: Session,
-  ticket: Ticket,
-  contact: Contact,
-  mediaSent: Message | undefined
-): Promise<void> => {
-  const bodyMessage = getBodyMessage(msg);
 
-  if (!bodyMessage) return;
+// const handleOpenAi = async (
+//   msg: proto.IWebMessageInfo,
+//   wbot: Session,
+//   ticket: Ticket,
+//   contact: Contact,
+//   mediaSent: Message | undefined
+// ): Promise<void> => {
+//   const bodyMessage = getBodyMessage(msg);
 
-
-  let { prompt } = await ShowWhatsAppService(wbot.id, ticket.companyId);
+//   if (!bodyMessage) return;
 
 
-  if (!prompt && !isNil(ticket?.queue?.prompt)) {
-    prompt = ticket.queue.prompt;
-  }
-
-  if (!prompt) return;
-
-  if (msg.messageStubType) return;
-
-  const publicFolder: string = path.resolve(
-    __dirname,
-    "..",
-    "..",
-    "..",
-    "public"
-  );
-
-  let openai: SessionOpenAi;
-  const openAiIndex = sessionsOpenAi.findIndex(s => s.id === wbot.id);
+//   let { prompt } = await ShowWhatsAppService(wbot.id, ticket.companyId);
 
 
-  if (openAiIndex === -1) {
-    const configuration = new Configuration({
-      apiKey: prompt.apiKey
-    });
-    openai = new OpenAIApi(configuration);
-    openai.id = wbot.id;
-    sessionsOpenAi.push(openai);
-  } else {
-    openai = sessionsOpenAi[openAiIndex];
-  }
+//   if (!prompt && !isNil(ticket?.queue?.prompt)) {
+//     prompt = ticket.queue.prompt;
+//   }
 
-  const messages = await Message.findAll({
-    where: { ticketId: ticket.id },
-    order: [["createdAt", "ASC"]],
-    limit: prompt.maxMessages
-  });
+//   if (!prompt) return;
 
-  const promptSystem = `Nas respostas utilize o nome ${sanitizeName(
-    contact.name || "Amigo(a)"
-  )} para identificar o cliente.\nSua resposta deve usar no máximo ${prompt.maxTokens
-    } tokens e cuide para não truncar o final.\nSempre que possível, mencione o nome dele para ser mais personalizado o atendimento e mais educado. Quando a resposta requer uma transferência para o setor de atendimento, comece sua resposta com 'Ação: Transferir para o setor de atendimento'.\n
-  ${prompt.prompt}\n`;
+//   if (msg.messageStubType) return;
 
-  let messagesOpenAi: ChatCompletionRequestMessage[] = [];
+//   const publicFolder: string = path.resolve(
+//     __dirname,
+//     "..",
+//     "..",
+//     "..",
+//     "public"
+//   );
 
-  if (msg.message?.conversation || msg.message?.extendedTextMessage?.text) {
-    messagesOpenAi = [];
-    messagesOpenAi.push({ role: "system", content: promptSystem });
-    for (
-      let i = 0;
-      i < Math.min(prompt.maxMessages, messages.length);
-      i++
-    ) {
-      const message = messages[i];
-      if (message.mediaType === "chat") {
-        if (message.fromMe) {
-          messagesOpenAi.push({ role: "assistant", content: message.body });
-        } else {
-          messagesOpenAi.push({ role: "user", content: message.body });
-        }
-      }
-    }
-    messagesOpenAi.push({ role: "user", content: bodyMessage! });
+//   let openai: SessionOpenAi;
+//   const openAiIndex = sessionsOpenAi.findIndex(s => s.id === wbot.id);
 
-    const chat = await openai.createChatCompletion({
-      model: "gpt-3.5-turbo-1106",
-      messages: messagesOpenAi,
-      max_tokens: prompt.maxTokens,
-      temperature: prompt.temperature
-    });
 
-    let response = chat.data.choices[0].message?.content;
+//   if (openAiIndex === -1) {
+//     const configuration = new Configuration({
+//       apiKey: prompt.apiKey
+//     });
+//     openai = new OpenAIApi(configuration);
+//     openai.id = wbot.id;
+//     sessionsOpenAi.push(openai);
+//   } else {
+//     openai = sessionsOpenAi[openAiIndex];
+//   }
 
-    if (response?.includes("Ação: Transferir para o setor de atendimento")) {
-      await transferQueue(prompt.queueId, ticket, contact);
-      response = response
-        .replace("Ação: Transferir para o setor de atendimento", "")
-        .trim();
-    }
+//   const messages = await Message.findAll({
+//     where: { ticketId: ticket.id },
+//     order: [["createdAt", "ASC"]],
+//     limit: prompt.maxMessages
+//   });
 
-    if (prompt.voice === "texto") {
-      const sentMessage = await wbot.sendMessage(msg.key.remoteJid!, {
-        text: response!
-      });
-      await verifyMessage(sentMessage!, ticket, contact);
-    } else {
-      const fileNameWithOutExtension = `${ticket.id}_${Date.now()}`;
-      convertTextToSpeechAndSaveToFile(
-        keepOnlySpecifiedChars(response!),
-        `${publicFolder}/${fileNameWithOutExtension}`,
-        prompt.voiceKey,
-        prompt.voiceRegion,
-        prompt.voice,
-        "mp3"
-      ).then(async () => {
-        try {
-          const sendMessage = await wbot.sendMessage(msg.key.remoteJid!, {
-            audio: { url: `${publicFolder}/${fileNameWithOutExtension}.mp3` },
-            mimetype: "audio/mpeg",
-            ptt: true
-          });
-          await verifyMediaMessage(sendMessage!, ticket, contact);
-          deleteFileSync(`${publicFolder}/${fileNameWithOutExtension}.mp3`);
-          deleteFileSync(`${publicFolder}/${fileNameWithOutExtension}.wav`);
-        } catch (error) {
-          console.log(`Erro para responder com audio: ${error}`);
-        }
-      });
-    }
-  } else if (msg.message?.audioMessage) {
-    const mediaUrl = mediaSent!.mediaUrl!.split("/").pop();
-    const file = fs.createReadStream(`${publicFolder}/${mediaUrl}`) as any;
-    const transcription = await openai.createTranscription(file, "whisper-1");
+//   const promptSystem = `Nas respostas utilize o nome ${sanitizeName(
+//     contact.name || "Amigo(a)"
+//   )} para identificar o cliente.\nSua resposta deve usar no máximo ${prompt.maxTokens
+//     } tokens e cuide para não truncar o final.\nSempre que possível, mencione o nome dele para ser mais personalizado o atendimento e mais educado. Quando a resposta requer uma transferência para o setor de atendimento, comece sua resposta com 'Ação: Transferir para o setor de atendimento'.\n
+//   ${prompt.prompt}\n`;
 
-    messagesOpenAi = [];
-    messagesOpenAi.push({ role: "system", content: promptSystem });
-    for (
-      let i = 0;
-      i < Math.min(prompt.maxMessages, messages.length);
-      i++
-    ) {
-      const message = messages[i];
-      if (message.mediaType === "chat") {
-        if (message.fromMe) {
-          messagesOpenAi.push({ role: "assistant", content: message.body });
-        } else {
-          messagesOpenAi.push({ role: "user", content: message.body });
-        }
-      }
-    }
-    messagesOpenAi.push({ role: "user", content: transcription.data.text });
-    const chat = await openai.createChatCompletion({
-      model: "gpt-3.5-turbo-1106",
-      messages: messagesOpenAi,
-      max_tokens: prompt.maxTokens,
-      temperature: prompt.temperature
-    });
-    let response = chat.data.choices[0].message?.content;
+//   let messagesOpenAi: ChatCompletionRequestMessage[] = [];
 
-    if (response?.includes("Ação: Transferir para o setor de atendimento")) {
-      await transferQueue(prompt.queueId, ticket, contact);
-      response = response
-        .replace("Ação: Transferir para o setor de atendimento", "")
-        .trim();
-    }
-    if (prompt.voice === "texto") {
-      const sentMessage = await wbot.sendMessage(msg.key.remoteJid!, {
-        text: response!
-      });
-      await verifyMessage(sentMessage!, ticket, contact);
-    } else {
-      const fileNameWithOutExtension = `${ticket.id}_${Date.now()}`;
-      convertTextToSpeechAndSaveToFile(
-        keepOnlySpecifiedChars(response!),
-        `${publicFolder}/${fileNameWithOutExtension}`,
-        prompt.voiceKey,
-        prompt.voiceRegion,
-        prompt.voice,
-        "mp3"
-      ).then(async () => {
-        try {
-          const sendMessage = await wbot.sendMessage(msg.key.remoteJid!, {
-            audio: { url: `${publicFolder}/${fileNameWithOutExtension}.mp3` },
-            mimetype: "audio/mpeg",
-            ptt: true
-          });
-          await verifyMediaMessage(sendMessage!, ticket, contact);
-          deleteFileSync(`${publicFolder}/${fileNameWithOutExtension}.mp3`);
-          deleteFileSync(`${publicFolder}/${fileNameWithOutExtension}.wav`);
-        } catch (error) {
-          console.log(`Erro para responder com audio: ${error}`);
-        }
-      });
-    }
-  }
-  messagesOpenAi = [];
-};
+//   if (msg.message?.conversation || msg.message?.extendedTextMessage?.text) {
+//     messagesOpenAi = [];
+//     messagesOpenAi.push({ role: "system", content: promptSystem });
+//     for (
+//       let i = 0;
+//       i < Math.min(prompt.maxMessages, messages.length);
+//       i++
+//     ) {
+//       const message = messages[i];
+//       if (message.mediaType === "chat") {
+//         if (message.fromMe) {
+//           messagesOpenAi.push({ role: "assistant", content: message.body });
+//         } else {
+//           messagesOpenAi.push({ role: "user", content: message.body });
+//         }
+//       }
+//     }
+//     messagesOpenAi.push({ role: "user", content: bodyMessage! });
+
+//     const chat = await openai.createChatCompletion({
+//       model: "gpt-3.5-turbo-1106",
+//       messages: messagesOpenAi,
+//       max_tokens: prompt.maxTokens,
+//       temperature: prompt.temperature
+//     });
+
+//     let response = chat.data.choices[0].message?.content;
+
+//     if (response?.includes("Ação: Transferir para o setor de atendimento")) {
+//       await transferQueue(prompt.queueId, ticket, contact);
+//       response = response
+//         .replace("Ação: Transferir para o setor de atendimento", "")
+//         .trim();
+//     }
+
+//     if (prompt.voice === "texto") {
+//       const sentMessage = await wbot.sendMessage(msg.key.remoteJid!, {
+//         text: response!
+//       });
+//       await verifyMessage(sentMessage!, ticket, contact);
+//     } else {
+//       const fileNameWithOutExtension = `${ticket.id}_${Date.now()}`;
+//       convertTextToSpeechAndSaveToFile(
+//         keepOnlySpecifiedChars(response!),
+//         `${publicFolder}/${fileNameWithOutExtension}`,
+//         prompt.voiceKey,
+//         prompt.voiceRegion,
+//         prompt.voice,
+//         "mp3"
+//       ).then(async () => {
+//         try {
+//           const sendMessage = await wbot.sendMessage(msg.key.remoteJid!, {
+//             audio: { url: `${publicFolder}/${fileNameWithOutExtension}.mp3` },
+//             mimetype: "audio/mpeg",
+//             ptt: true
+//           });
+//           await verifyMediaMessage(sendMessage!, ticket, contact);
+//           deleteFileSync(`${publicFolder}/${fileNameWithOutExtension}.mp3`);
+//           deleteFileSync(`${publicFolder}/${fileNameWithOutExtension}.wav`);
+//         } catch (error) {
+//           console.log(`Erro para responder com audio: ${error}`);
+//         }
+//       });
+//     }
+//   } else if (msg.message?.audioMessage) {
+//     const mediaUrl = mediaSent!.mediaUrl!.split("/").pop();
+//     const file = fs.createReadStream(`${publicFolder}/${mediaUrl}`) as any;
+//     const transcription = await openai.createTranscription(file, "whisper-1");
+
+//     messagesOpenAi = [];
+//     messagesOpenAi.push({ role: "system", content: promptSystem });
+//     for (
+//       let i = 0;
+//       i < Math.min(prompt.maxMessages, messages.length);
+//       i++
+//     ) {
+//       const message = messages[i];
+//       if (message.mediaType === "chat") {
+//         if (message.fromMe) {
+//           messagesOpenAi.push({ role: "assistant", content: message.body });
+//         } else {
+//           messagesOpenAi.push({ role: "user", content: message.body });
+//         }
+//       }
+//     }
+//     messagesOpenAi.push({ role: "user", content: transcription.data.text });
+//     const chat = await openai.createChatCompletion({
+//       model: "gpt-3.5-turbo-1106",
+//       messages: messagesOpenAi,
+//       max_tokens: prompt.maxTokens,
+//       temperature: prompt.temperature
+//     });
+//     let response = chat.data.choices[0].message?.content;
+
+//     if (response?.includes("Ação: Transferir para o setor de atendimento")) {
+//       await transferQueue(prompt.queueId, ticket, contact);
+//       response = response
+//         .replace("Ação: Transferir para o setor de atendimento", "")
+//         .trim();
+//     }
+//     if (prompt.voice === "texto") {
+//       const sentMessage = await wbot.sendMessage(msg.key.remoteJid!, {
+//         text: response!
+//       });
+//       await verifyMessage(sentMessage!, ticket, contact);
+//     } else {
+//       const fileNameWithOutExtension = `${ticket.id}_${Date.now()}`;
+//       convertTextToSpeechAndSaveToFile(
+//         keepOnlySpecifiedChars(response!),
+//         `${publicFolder}/${fileNameWithOutExtension}`,
+//         prompt.voiceKey,
+//         prompt.voiceRegion,
+//         prompt.voice,
+//         "mp3"
+//       ).then(async () => {
+//         try {
+//           const sendMessage = await wbot.sendMessage(msg.key.remoteJid!, {
+//             audio: { url: `${publicFolder}/${fileNameWithOutExtension}.mp3` },
+//             mimetype: "audio/mpeg",
+//             ptt: true
+//           });
+//           await verifyMediaMessage(sendMessage!, ticket, contact);
+//           deleteFileSync(`${publicFolder}/${fileNameWithOutExtension}.mp3`);
+//           deleteFileSync(`${publicFolder}/${fileNameWithOutExtension}.wav`);
+//         } catch (error) {
+//           console.log(`Erro para responder com audio: ${error}`);
+//         }
+//       });
+//     }
+//   }
+//   messagesOpenAi = [];
+// };
 
 const transferQueue = async (
   queueId: number,
@@ -1052,7 +1054,7 @@ const verifyQueue = async (
 
 
 
-      await handleOpenAi(msg, wbot, ticket, contact, mediaSent);
+      // await handleOpenAi(msg, wbot, ticket, contact, mediaSent);
 
 
       await ticket.update({
@@ -1171,7 +1173,7 @@ const verifyQueue = async (
         !ticket.isGroup &&
         !isNil(choosenQueue?.promptId)
       ) {
-        await handleOpenAi(msg, wbot, ticket, contact, mediaSent);
+        // await handleOpenAi(msg, wbot, ticket, contact, mediaSent);
 
 
         await ticket.update({
@@ -1798,7 +1800,7 @@ const handleMessage = async (
       console.log(e);
     }
 
-    // Atualiza o ticket se a ultima mensagem foi enviada por mim, para que possa ser finalizado. 
+    // Atualiza o ticket se a ultima mensagem foi enviada por mim, para que possa ser finalizado.
     try {
       await ticket.update({
         fromMe: msg.key.fromMe,
@@ -1932,7 +1934,7 @@ const handleMessage = async (
       !ticket.userId &&
       !isNil(whatsapp.promptId)
     ) {
-      await handleOpenAi(msg, wbot, ticket, contact, mediaSent);
+      // await handleOpenAi(msg, wbot, ticket, contact, mediaSent);
     }
 
     //integraçao na conexao
@@ -1963,7 +1965,7 @@ const handleMessage = async (
       ticket.queueId
 
     ) {
-      await handleOpenAi(msg, wbot, ticket, contact, mediaSent);
+      // await handleOpenAi(msg, wbot, ticket, contact, mediaSent);
     }
 
     if (
@@ -1971,7 +1973,7 @@ const handleMessage = async (
       !ticket.isGroup &&
       !ticket.userId &&
       ticket.integrationId &&
-      ticket.useIntegration && 
+      ticket.useIntegration &&
       ticket.queue
     ) {
 

@@ -82,6 +82,10 @@ __decorate([
     __metadata("design:type", Date)
 ], User.prototype, "updatedAt", void 0);
 __decorate([
+    sequelize_typescript_1.Column,
+    __metadata("design:type", Number)
+], User.prototype, "limitAttendance", void 0);
+__decorate([
     (0, sequelize_typescript_1.ForeignKey)(() => Company_1.default),
     sequelize_typescript_1.Column,
     __metadata("design:type", Number)

@@ -23,7 +23,7 @@ const index = async (req, res) => {
 };
 exports.index = index;
 const store = async (req, res) => {
-    const { name, color, greetingMessage, outOfHoursMessage, schedules, orderQueue, chatOperator, integrationId, promptId } = req.body;
+    const { name, color, greetingMessage, outOfHoursMessage, schedules, orderQueue, integrationId, promptId } = req.body;
     const { companyId } = req.user;
     console.log("queue", integrationId, promptId);
     const queue = await (0, CreateQueueService_1.default)({
@@ -34,7 +34,6 @@ const store = async (req, res) => {
         outOfHoursMessage,
         schedules,
         orderQueue: orderQueue === "" ? null : orderQueue,
-        chatOperator: chatOperator === "" ? null : chatOperator,
         integrationId: integrationId === "" ? null : integrationId,
         promptId: promptId === "" ? null : promptId
     });
@@ -56,7 +55,7 @@ exports.show = show;
 const update = async (req, res) => {
     const { queueId } = req.params;
     const { companyId } = req.user;
-    const { name, color, greetingMessage, outOfHoursMessage, schedules, orderQueue, chatOperator, integrationId, promptId } = req.body;
+    const { name, color, greetingMessage, outOfHoursMessage, schedules, orderQueue, integrationId, promptId } = req.body;
     const queue = await (0, UpdateQueueService_1.default)(queueId, {
         name,
         color,
@@ -64,7 +63,6 @@ const update = async (req, res) => {
         outOfHoursMessage,
         schedules,
         orderQueue: orderQueue === "" ? null : orderQueue,
-        chatOperator: chatOperator === "" ? null : chatOperator,
         integrationId: integrationId === "" ? null : integrationId,
         promptId: promptId === "" ? null : promptId
     }, companyId);

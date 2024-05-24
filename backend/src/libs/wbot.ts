@@ -102,6 +102,7 @@ export const initWASocket = async (whatsapp: Whatsapp): Promise<Session> => {
           browser: Browsers.appropriate("Desktop"),
           auth: {
             creds: state.creds,
+            // @ts-ignore
             keys: makeCacheableSignalKeyStore(state.keys, logger),
           },
           version,

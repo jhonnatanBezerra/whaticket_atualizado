@@ -168,7 +168,7 @@ async function handleVerifyQueue(job) {
                             }
                         }
                         else {
-                            logger_1.logger.info(`Condição não respeitada - Empresa: ${companyId}`);
+                            logger_1.logger.info(`Condicao nao respeitada - Empresa: ${companyId}`);
                         }
                     }
                 }
