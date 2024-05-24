@@ -9,6 +9,8 @@ import ShowTicketUUIDService from "../services/TicketServices/ShowTicketFromUUID
 import ShowTicketService from "../services/TicketServices/ShowTicketService";
 import UpdateTicketService from "../services/TicketServices/UpdateTicketService";
 import ListTicketsServiceKanban from "../services/TicketServices/ListTicketsServiceKanban";
+import AppError from "../errors/AppError";
+import User from "../models/User";
 
 type IndexQuery = {
   searchParam: string;
@@ -88,7 +90,14 @@ export const index = async (req: Request, res: Response): Promise<Response> => {
 
 export const store = async (req: Request, res: Response): Promise<Response> => {
   const { contactId, status, userId, queueId, whatsappId }: TicketData = req.body;
-  const { companyId } = req.user;
+  const { companyId, id } = req.user;
+
+  const ticketCount = await Ticket.count({ where: { userId: id, status: "open", companyId } });
+  const { limitAttendance, name } = await User.findByPk(id);
+
+  if (ticketCount >= limitAttendance) {
+    throw new AppError(`Número máximo de atendimentos atingido para o usuario ${name}, encerre um atendimento para criar um novo.`, 400);
+  }
 
   const ticket = await CreateTicketService({
     contactId,
@@ -185,14 +194,16 @@ export const update = async (
 ): Promise<Response> => {
   const { ticketId } = req.params;
   const ticketData: TicketData = req.body;
-  const { companyId } = req.user;
+  const { companyId, id } = req.user;
 
-  const { ticket } = await UpdateTicketService({
-    ticketData,
-    ticketId,
-    companyId
-  });
+  const ticketCount = await Ticket.count({ where: { userId: id, status: "open", companyId } });
+  const { limitAttendance, name } = await User.findByPk(id);
 
+  if (ticketData.status === "open" && ticketCount >= limitAttendance) {
+    throw new AppError(`Número máximo de atendimentos atingido para o usuario ${name}, encerre um atendimento para aceitar um novo.`, 400);
+  }
+
+  const { ticket } = await UpdateTicketService({ ticketData, ticketId, companyId });
 
   return res.status(200).json(ticket);
 };

@@ -62,6 +62,9 @@ class User extends Model<User> {
   @UpdatedAt
   updatedAt: Date;
 
+  @Column
+  limitAttendance: number;
+
   @ForeignKey(() => Company)
   @Column
   companyId: number;

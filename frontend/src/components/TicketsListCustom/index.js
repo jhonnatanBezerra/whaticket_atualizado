@@ -187,12 +187,12 @@ const TicketsListCustom = (props) => {
 
   useEffect(() => {
     const queueIds = queues.map((q) => q.id);
-    const filteredTickets = tickets.filter(
-      (t) => queueIds.indexOf(t.queueId) > -1
-    );
+    const filteredTickets = tickets.filter((t) => queueIds.indexOf(t.queueId) > -1);
+    const ticketWithQueue = tickets.filter((t) => t.queueId);
+
 
     if (profile === "user") {
-      dispatch({ type: "LOAD_TICKETS", payload: filteredTickets });
+      dispatch({ type: "LOAD_TICKETS", payload: ticketWithQueue });
     } else {
       dispatch({ type: "LOAD_TICKETS", payload: tickets });
     }
@@ -206,9 +206,7 @@ const TicketsListCustom = (props) => {
       (!ticket.userId || ticket.userId === user?.id || showAll) &&
       (!ticket.queueId || selectedQueueIds.indexOf(ticket.queueId) > -1);
 
-    const notBelongsToUserQueues = (ticket) =>
-      ticket.queueId && selectedQueueIds.indexOf(ticket.queueId) === -1;
-
+    const notBelongsToUserQueues = (ticket) => ticket.queueId && selectedQueueIds.indexOf(ticket.queueId) === -1 || (ticket.queueId === null && user.profile === "user");
     socket.on("connect", () => {
       if (status) {
         socket.emit("joinTickets", status);
@@ -218,7 +216,6 @@ const TicketsListCustom = (props) => {
     });
 
     socket.on(`company-${companyId}-ticket`, (data) => {
-      
       if (data.action === "updateUnread") {
         dispatch({
           type: "RESET_UNREAD",
